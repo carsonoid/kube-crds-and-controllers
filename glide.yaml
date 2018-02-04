@@ -5,3 +5,6 @@ import:
    version: v5.0.1
  - package: k8s.io/apimachinery
    version: '019ae5ada31de202164b118aee88ee2d14075c31'
+
+# For better yaml handling
+ - package: github.com/ghodss/yaml
