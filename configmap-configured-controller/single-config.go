@@ -206,11 +206,10 @@ func (plc *PodLabelController) loadConfigMap(cm *corev1.ConfigMap) error {
 		// Update config pointer
 		plc.Config = &c
 
-		log.Printf("Loaded new config: %+v", *plc.Config)
-
 		// Send Load/Reload signal
 		plc.configLoadChan <- true
 	}
+	log.Printf("Loaded new config: %+v", *plc.Config)
 	return nil
 }
 
