@@ -3,10 +3,10 @@ gen-go-crs:
 	all \
 	github.com/carsonoid/kube-crds-and-controllers/crd-configured-controller/pkg/client \
 	github.com/carsonoid/kube-crds-and-controllers/crd-configured-controller/pkg/apis \
-	"podlabelconfig:v1alpha1"
+	"podlabeler:v1alpha1"
 
 	# workaround https://github.com/openshift/origin/issues/10357
-	find pkg/client -name "clientset_generated.go" -exec sed -i'' 's/return \\&Clientset{fakePtr/return \\&Clientset{\\&fakePtr/g' '{}' \;
+	find */pkg/client -name "clientset_generated.go" -exec sed -i'' 's/return \\&Clientset{fakePtr/return \\&Clientset{\\&fakePtr/g' '{}' \;
 
 all: clean godeps gen-go-crs test
 

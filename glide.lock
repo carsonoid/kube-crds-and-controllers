@@ -1,5 +1,5 @@
-hash: d08082824cf50f07d634e9d6a8d3173dc3b161f47114485a64014775cd2ae199
-updated: 2018-02-03T17:56:40.399691504-07:00
+hash: 5b0b0d2840acb296a3d3323bd824f7ebd112143f479396d38ae1c045aea90377
+updated: 2018-02-03T18:45:23.372156245-07:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
@@ -234,6 +234,8 @@ imports:
   - util/integer
 - name: k8s.io/code-generator
   version: 961bc077103364eb5bda2c40e2b560d068c9a8c6
+- name: k8s.io/gengo
+  version: 8394c995ab8fbe52216f38d0e1a37de36d820528
 - name: k8s.io/kube-openapi
   version: 868f2f29720b192240e18284659231b440f9cda5
   subpackages:

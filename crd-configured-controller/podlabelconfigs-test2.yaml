@@ -1,0 +1,8 @@
+apiVersion: podlabeler.k8s.carsonoid.net/v1alpha1
+kind: PodLabelConfig
+metadata:
+  name: test2
+  namespace: default
+spec:
+  labels:
+    labeled-from-crd-test2: "true"
