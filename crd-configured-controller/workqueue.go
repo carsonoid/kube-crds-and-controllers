@@ -10,6 +10,7 @@ import (
 	logging "log"
 	"os"
 	"path/filepath"
+	"time"
 
 	// Kubernetes and client-go
 	corev1 "k8s.io/api/core/v1"
@@ -21,8 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/workqueue"
 
 	// Custom resources
 	plv1alpha1 "github.com/carsonoid/kube-crds-and-controllers/crd-configured-controller/pkg/apis/podlabeler/v1alpha1"
@@ -41,13 +44,19 @@ type PodLabelController struct {
 
 	podLabelConfigStore      cache.Store
 	podLabelConfigController cache.Controller
+
+	numPodWorkers *int
+	podIndexer    cache.Indexer
+	podQueue      workqueue.RateLimitingInterface
+	podInformer   cache.Controller
 }
 
 // NewPodLabelController takes a kubernetes clientset and configuration and returns a valid PodLabelController
-func NewPodLabelController(client *kubernetes.Clientset, plClientset *plclient.Clientset) *PodLabelController {
+func NewPodLabelController(client *kubernetes.Clientset, plClientset *plclient.Clientset, numPodWorkers *int) *PodLabelController {
 	return &PodLabelController{
-		client:      client,
-		plClientset: plClientset,
+		client:        client,
+		plClientset:   plClientset,
+		numPodWorkers: numPodWorkers,
 	}
 }
 
@@ -82,12 +91,15 @@ func (plc *PodLabelController) StartPodController(killChan chan struct{}) {
 	restClient := plc.client.CoreV1().RESTClient()
 	listwatch := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
 
-	_, controller := cache.NewInformer(listwatch, &corev1.Pod{}, 0,
+	plc.podQueue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+
+	plc.podIndexer, plc.podInformer = cache.NewIndexerInformer(listwatch, &corev1.Pod{}, 0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				log.Print("Pod Add Event")
-				if err := plc.handlePod(obj.(*corev1.Pod)); err != nil {
-					log.Printf("Error handling pod: %s", err)
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					plc.podQueue.Add(key)
 				}
 			},
 			UpdateFunc: func(oldobj interface{}, newobj interface{}) {
@@ -95,22 +107,112 @@ func (plc *PodLabelController) StartPodController(killChan chan struct{}) {
 				// Make sure object is not set for deltion and was actually changed
 				if newobj.(*corev1.Pod).GetDeletionTimestamp() == nil &&
 					oldobj.(*corev1.Pod).GetResourceVersion() != newobj.(*corev1.Pod).GetResourceVersion() {
-					if err := plc.handlePod(newobj.(*corev1.Pod)); err != nil {
-						log.Printf("Error handling pod: %s", err)
+					key, err := cache.MetaNamespaceKeyFunc(newobj)
+					if err == nil {
+						plc.podQueue.Add(key)
 					}
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				log.Print("Pod Delete Event")
-				// nothing to do
+				// Rester delete with delta queue
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					plc.podQueue.Add(key)
+				}
 			},
-		},
-	)
+		}, cache.Indexers{})
 
 	// Watch for config reloads and then restart the controller so all existing pods
 	// are re-evaluted with new config
 
-	go controller.Run(killChan)
+	go plc.StartQueueWorkers(*plc.numPodWorkers, killChan)
+}
+
+func (plc *PodLabelController) StartQueueWorkers(threadiness int, stopCh chan struct{}) {
+	defer runtime.HandleCrash()
+
+	// Let the workers stop when we are done
+	defer plc.podQueue.ShutDown()
+	log.Println("Starting Pod Queue Workers")
+
+	go plc.podInformer.Run(stopCh)
+
+	// Wait for all involved caches to be synced, before processing items from the queue is started
+	if !cache.WaitForCacheSync(stopCh, plc.podInformer.HasSynced) {
+		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
+		return
+	}
+
+	for i := 0; i < threadiness; i++ {
+		go wait.Until(plc.runPodQueueWorker, time.Second, stopCh)
+	}
+
+	<-stopCh
+	log.Println("Stopping Pod Queue Workers")
+}
+
+func (plc *PodLabelController) runPodQueueWorker() {
+	for plc.processNextPod() {
+	}
+}
+
+func (plc *PodLabelController) processNextPod() bool {
+	// Wait until there is a new item in the working queue
+	key, quit := plc.podQueue.Get()
+	if quit {
+		return false
+	}
+	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
+	// This allows safe parallel processing because two pods with the same key are never processed in
+	// parallel.
+	defer plc.podQueue.Done(key)
+
+	// Invoke the method containing the business logic
+	err := plc.processPod(key.(string))
+	// Handle the error if something went wrong during the execution of the business logic
+	plc.handleErr(err, key)
+	return true
+}
+
+func (plc *PodLabelController) processPod(key string) error {
+	obj, exists, err := plc.podIndexer.GetByKey(key)
+	if err != nil {
+		log.Printf("Fetching object with key %s from store failed with %v\n", key, err)
+		return err
+	}
+
+	if exists {
+		plc.handlePod(obj.(*corev1.Pod))
+	}
+
+	return nil
+}
+
+// handleErr checks if an error happened and makes sure we will retry later.
+func (plc *PodLabelController) handleErr(err error, key interface{}) {
+	if err == nil {
+		// Forget about the #AddRateLimited history of the key on every successful synchronization.
+		// This ensures that future processing of updates for this key is not delayed because of
+		// an outdated error history.
+		plc.podQueue.Forget(key)
+		return
+	}
+
+	// This controller retries 5 times if something goes wrong. After that, it stops trying.
+	if plc.podQueue.NumRequeues(key) < 5 {
+		log.Printf("Error syncing pod %v: %v\n", key, err)
+
+		// Re-enqueue the key rate limited. Based on the rate limiter on the
+		// queue and the re-enqueue history, the key will be processed later again.
+		plc.podQueue.AddRateLimited(key)
+		return
+	}
+
+	plc.podQueue.Forget(key)
+	// Report to an external entity that, even after several retries, we could not successfully process this key
+	runtime.HandleError(err)
+	log.Printf("Dropping pod %q out of the queue: %v\n", key, err)
 }
 
 func (plc *PodLabelController) handlePod(pod *corev1.Pod) error {
@@ -119,6 +221,12 @@ func (plc *PodLabelController) handlePod(pod *corev1.Pod) error {
 		return err
 	}
 	newPod := o.(*corev1.Pod)
+
+	// Get latest pod from api
+	// newPod, err := plc.client.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), metav1.GetOptions{})
+	// if err != nil {
+	// 	return err
+	// }
 
 	// apply labels if needed
 	// if no changes then return
@@ -164,7 +272,7 @@ func (plc *PodLabelController) labelPod(pod *corev1.Pod) bool {
 			// check keys
 			for k, newVal := range c.Spec.Labels {
 				if curVal, ok := pod.GetLabels()[k]; ok && curVal == newVal {
-					// log.Printf("Pod %s already has label: %s=%s", pod.GetName(), k, newVal)
+					log.Printf("Pod %s already has label: %s=%s", pod.GetName(), k, newVal)
 				} else {
 					log.Printf("Pod %s needs label: %s=%s", pod.GetName(), k, newVal)
 					pod.Labels[k] = newVal
@@ -229,6 +337,8 @@ func main() {
 
 	var kubeconfig *string
 	kubeconfig = flag.String("kubeconfig", filepath.Join(os.Getenv("HOME"), ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	var numPodWorkers *int
+	numPodWorkers = flag.Int("num-pod-workers", 1, "(optional) number of concurrent pod workers")
 	flag.Parse()
 
 	// use the current context in kubeconfig
@@ -250,7 +360,7 @@ func main() {
 	}
 
 	// Create controller, passing all clients
-	plc := NewPodLabelController(clientset, plClientset)
+	plc := NewPodLabelController(clientset, plClientset, numPodWorkers)
 
 	// Run controller
 	plc.Run()

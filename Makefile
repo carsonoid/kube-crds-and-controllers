@@ -10,6 +10,9 @@ gen-go-crs:
 
 all: clean godeps gen-go-crs test
 
+build/%:
+	go build -i -v -o build/$1 $1.go.go
+
 godeps:
 	glide i
 
