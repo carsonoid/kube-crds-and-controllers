@@ -41,7 +41,7 @@ godeps:
 clean: clean-build clean-go-crds
 
 clean-build:
-	# Clean up build idr
+	# Clean up build dir
 	rm -rf build/*
 
 clean-go-crds:
