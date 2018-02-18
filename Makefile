@@ -1,29 +1,50 @@
-gen-go-crs:
+PHONY: all gen-go-crds all-controllers
+
+gen-go-crds: clean-go-crds # Must be cleaned so that removals happen properly
 	./vendor/k8s.io/code-generator/generate-groups.sh \
 	all \
-	github.com/carsonoid/kube-crds-and-controllers/crd-configured-controller/pkg/client \
-	github.com/carsonoid/kube-crds-and-controllers/crd-configured-controller/pkg/apis \
+	github.com/carsonoid/kube-crds-and-controllers/controllers/crd-configured/pkg/client \
+	github.com/carsonoid/kube-crds-and-controllers/controllers/crd-configured/pkg/apis \
 	"podlabeler:v1alpha1"
 
 	# workaround https://github.com/openshift/origin/issues/10357
-	find */pkg/client -name "clientset_generated.go" -exec sed -i'' 's/return \\&Clientset{fakePtr/return \\&Clientset{\\&fakePtr/g' '{}' \;
+	find controllers/*/pkg/client -name "clientset_generated.go" -exec sed -i'' 's/return \\&Clientset{fakePtr/return \\&Clientset{\\&fakePtr/g' '{}' \;
 
-all: clean godeps gen-go-crs test
+all: clean godeps gen-go-crds all-controllers
 
-build/%:
-	go build -i -v -o build/$1 $1.go.go
+all-controllers: \
+controllers/hard-coded/simple \
+controllers/hard-coded/structured \
+controllers/configmap-configured/single-config \
+controllers/configmap-configured/multi-config \
+controllers/crd-configured/simple \
+controllers/crd-configured/workqueue
+
+help:
+	@echo "make run-controllers/hard-coded/simple"
+	@echo "make run-controllers/hard-coded/structured"
+	@echo "make run-controllers/configmap-configured/single-config"
+	@echo "make run-controllers/configmap-configured/multi-config"
+	@echo "make run-controllers/crd-configured/simple"
+	@echo "make run-controllers/crd-configured/workqueue"
+
+controllers/%:
+	@mkdir build >/dev/null 2>1|| true
+	go build -i -o build/$@ $@.go
+
+run-controllers/%: controllers/%
+	./build/controllers/$*
 
 godeps:
 	glide i
 
-clean:
+clean: clean-build clean-go-crds
+
+clean-build:
+	# Clean up build idr
+	rm -rf build/*
+
+clean-go-crds:
 	# Delete all generated code.
-	rm -rf pkg/client
-	rm -f pkg/apis/*/*/zz_generated.deepcopy.go
-
-# # This is a basic smoke-test to make sure the types compile
-# test:
-# 	go build -o build/crud -i _examples/clients/crud.go
-# 	go build -o build/list -i _examples/clients/list.go
-
-# 	@echo "All Test binaries Compiled!"
+	rm -rf controllers/crd-configured/pkg/client
+	rm -f  controllers/crd-configured/pkg/apis/*/*/zz_generated.deepcopy.go
