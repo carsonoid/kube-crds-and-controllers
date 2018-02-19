@@ -28,6 +28,12 @@ The simple controller, but with configuration moved to a more defined structure.
 make run-controllers/hard-coded/structured
 ```
 
+Or via a config file:
+
+```bash
+make run-controllers/hard-coded/structured OPTS="-config controllers/hard-coded/config.yaml"
+```
+
 ### controllers/configmap-configured
 
 Use a ConfigMap to configure the controller. This is essentially the same as passing a configmap

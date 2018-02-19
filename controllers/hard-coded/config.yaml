@@ -1,0 +1,3 @@
+targetNamespace: default
+labels:
+  is-from-config-file: "true"

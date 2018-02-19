@@ -17,7 +17,7 @@ controllers/%:
 	go build -i -o build/$@ $@.go
 
 run-controllers/%: controllers/%
-	./build/controllers/$*
+	./build/controllers/$* $OPTS
 
 godeps:
 	glide i

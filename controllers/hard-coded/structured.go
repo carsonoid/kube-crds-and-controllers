@@ -6,9 +6,13 @@ package main // import "github.com/carsonoid/kube-crds-and-controllers/hard-code
 import (
 	"encoding/json"
 	"flag"
+	"io/ioutil"
 	logging "log"
 	"os"
 	"path/filepath"
+
+	// Better yaml handling
+	"github.com/ghodss/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -140,6 +144,8 @@ func main() {
 
 	var kubeconfig *string
 	kubeconfig = flag.String("kubeconfig", filepath.Join(os.Getenv("HOME"), ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	var configPath *string
+	configPath = flag.String("config", "", "(optional) custom PodLabelConfig file")
 	flag.Parse()
 
 	// use the current context in kubeconfig
@@ -154,14 +160,30 @@ func main() {
 		panic(err.Error())
 	}
 
+	// Load default config or one from a file
+	var podlabelconfig *PodLabelConfig
+	if *configPath == "" {
+		podlabelconfig = &PodLabelConfig{
+			TargetNamespace: "default",
+			Labels: map[string]string{
+				"is-from-structured": "true",
+			},
+		}
+	} else {
+		y, err := ioutil.ReadFile(*configPath)
+		if err != nil {
+			log.Printf("Error reading config file: %v\n", err)
+			return
+		}
+		err = yaml.Unmarshal(y, &podlabelconfig)
+		if err != nil {
+			log.Printf("Error unmarshaling config yaml: %v\n", err)
+			return
+		}
+	}
+
 	// Run controller with hard-coded config
-	plc := NewPodLabelController(clientset, &PodLabelConfig{
-		TargetNamespace: "default",
-		Labels: map[string]string{
-			"is-awesome":     "true",
-			"is-not-awesome": "false",
-		},
-	})
+	plc := NewPodLabelController(clientset, podlabelconfig)
 
 	plc.Run()
 }
