@@ -8,6 +8,12 @@ Watch all pods in the cluster and make sure they all have a configurable set of 
 
 To illustrate basic functionality and common pitfalls this is broken up into three different projects:
 
+Before running any of the controllers below, make sure you everything is ready by running:
+
+```bash
+make
+```
+
 ### controllers/hard-coded
 
 A custom controller which has everything hard-coded
