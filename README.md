@@ -14,6 +14,14 @@ Before running any of the controllers below, make sure you everything is ready b
 make
 ```
 
+It may also be helpful to view the changes between controllers as a series of git commits. To do so you can run:
+
+```bash
+make diff-repo
+```
+
+And the repo will be generated, You can also find it at carsonoid/kube-crds-and-controllers-diffs
+
 ### controllers/hard-coded
 
 A custom controller which has everything hard-coded
