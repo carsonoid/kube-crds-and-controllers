@@ -1,4 +1,4 @@
-# Kuberenetes Controllers & CustomResourceDefinitions
+# Kubernetes Controllers & CustomResourceDefinitions
 
 ## The Goal
 
