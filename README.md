@@ -4,9 +4,15 @@
 
 Watch all pods in the cluster and make sure they all have a configurable set of labels.
 
-## The Projects
+## Dependencies
 
-To illustrate basic functionality and common pitfalls this is broken up into three different projects:
+All the example controllers here use `glide` for dependency management. They are built based on client-go version `v5.0.1` which is most compatible with Kubernetes v1.8.
+
+If you want to use a newer version of client-go, you can find examples that use the latest client-go version, `v6.0.0`, with `glide`, `godep`, and `dep` in the `deptoools` folder. 
+
+All the controllers here should be able to work with client-go `v6.0.0`, but some code change would be required as client-go has made breaking changes between `v5.0.x` and `v6.0.0.`
+
+## Getting Ready
 
 Before running any of the controllers below, make sure you everything is ready by running:
 
@@ -20,7 +26,11 @@ It may also be helpful to view the changes between controllers as a series of gi
 make diff-repo
 ```
 
-And the repo will be generated, You can also find it at carsonoid/kube-crds-and-controllers-diffs
+And the repo will be generated, You can also find it at `carsonoid/kube-crds-and-controllers-diffs`
+
+## The Controllers
+
+To illustrate basic functionality and common pitfalls the examples are broken up into three different groups: `hard-coded`, `configmap-configued`, and `crd-configured`. All the controllers do roughly the same thing but in different ways with different caveats.
 
 ### controllers/hard-coded
 
@@ -37,6 +47,8 @@ make run-controllers/hard-coded/simple
 ##### A structured hard-coded controller
 
 The simple controller, but with configuration moved to a more defined structure. Suitable for loading from a file.
+
+Hard-coded defaults via the struct:
 
 ```bash
 make run-controllers/hard-coded/structured
