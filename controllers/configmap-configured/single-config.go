@@ -67,33 +67,33 @@ func (plc *PodLabelController) Run() {
 	// wait for load/reload signal before starting pod controller
 	<-plc.configLoadChan
 
-	restClient := plc.client.CoreV1().RESTClient()
-	listwatch := cache.NewListWatchFromClient(restClient, "pods", plc.Config.TargetNamespace, fields.Everything())
-
-	_, controller := cache.NewInformer(listwatch, &corev1.Pod{}, 0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				log.Print("Pod Add Event")
-				if err := plc.handlePod(obj.(*corev1.Pod)); err != nil {
-					log.Printf("Error handling pod: %s", err)
-				}
-			},
-			UpdateFunc: func(oldobj interface{}, newobj interface{}) {
-				log.Print("Pod Update Event")
-				if err := plc.handlePod(newobj.(*corev1.Pod)); err != nil {
-					log.Printf("Error handling pod: %s", err)
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				log.Print("Pod Delete Event")
-				// nothing to do
-			},
-		},
-	)
-
-	// Watch for config reloads and then restart the controller so all existing pods
+	// Watch for config reloads and then recreate and restart the controller so all existing pods
 	// are re-evaluted with new config
 	for {
+		restClient := plc.client.CoreV1().RESTClient()
+		listwatch := cache.NewListWatchFromClient(restClient, "pods", plc.Config.TargetNamespace, fields.Everything())
+
+		_, controller := cache.NewInformer(listwatch, &corev1.Pod{}, 0,
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					log.Print("Pod Add Event")
+					if err := plc.handlePod(obj.(*corev1.Pod)); err != nil {
+						log.Printf("Error handling pod: %s", err)
+					}
+				},
+				UpdateFunc: func(oldobj interface{}, newobj interface{}) {
+					log.Print("Pod Update Event")
+					if err := plc.handlePod(newobj.(*corev1.Pod)); err != nil {
+						log.Printf("Error handling pod: %s", err)
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					log.Print("Pod Delete Event")
+					// nothing to do
+				},
+			},
+		)
+
 		log.Print("Starting Controller")
 		stopChan := make(chan struct{})
 		go controller.Run(stopChan)

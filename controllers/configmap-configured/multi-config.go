@@ -33,7 +33,7 @@ var (
 // These could be from flags if desired
 const (
 	configNamespace string = "kube-system"
-	configName      string = "pod-labeler-configs"
+	configName      string = "pod-labeler-config"
 )
 
 // PodLabelConfig holds the namespace to target and labels to be ensured
@@ -67,33 +67,33 @@ func (plc *PodLabelController) Run() {
 	// wait for load/reload signal before starting pod controller
 	<-plc.configLoadChan
 
-	restClient := plc.client.CoreV1().RESTClient()
-	listwatch := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
-
-	_, controller := cache.NewInformer(listwatch, &corev1.Pod{}, 0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				log.Print("Pod Add Event")
-				if err := plc.handlePod(obj.(*corev1.Pod)); err != nil {
-					log.Printf("Error handling pod: %s", err)
-				}
-			},
-			UpdateFunc: func(oldobj interface{}, newobj interface{}) {
-				log.Print("Pod Update Event")
-				if err := plc.handlePod(newobj.(*corev1.Pod)); err != nil {
-					log.Printf("Error handling pod: %s", err)
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				log.Print("Pod Delete Event")
-				// nothing to do
-			},
-		},
-	)
-
 	// Watch for config reloads and then restart the controller so all existing pods
 	// are re-evaluted with new config
 	for {
+		restClient := plc.client.CoreV1().RESTClient()
+		listwatch := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
+
+		_, controller := cache.NewInformer(listwatch, &corev1.Pod{}, 0,
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					log.Print("Pod Add Event")
+					if err := plc.handlePod(obj.(*corev1.Pod)); err != nil {
+						log.Printf("Error handling pod: %s", err)
+					}
+				},
+				UpdateFunc: func(oldobj interface{}, newobj interface{}) {
+					log.Print("Pod Update Event")
+					if err := plc.handlePod(newobj.(*corev1.Pod)); err != nil {
+						log.Printf("Error handling pod: %s", err)
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					log.Print("Pod Delete Event")
+					// nothing to do
+				},
+			},
+		)
+
 		log.Print("Starting Controller")
 		stopChan := make(chan struct{})
 		go controller.Run(stopChan)
@@ -216,10 +216,13 @@ func (plc *PodLabelController) loadConfigMap(cm *corev1.ConfigMap) error {
 		// Update map with pointer to struct
 		plc.Configs[k] = &c
 
-		// Send Load/Reload signal
-		plc.configLoadChan <- true
 	}
+
 	log.Printf("Loaded %d new configs", len(plc.Configs))
+
+	// Send Load/Reload signal
+	plc.configLoadChan <- true
+
 	return nil
 }
 

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pod-labeler-configs
+  name: pod-labeler-config
   namespace: kube-system
 data:
   config1: |
