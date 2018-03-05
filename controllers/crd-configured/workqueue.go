@@ -14,16 +14,15 @@ import (
 
 	// Kubernetes and client-go
 	corev1 "k8s.io/api/core/v1"
-	machinery_runtime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/cache"
-	// "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	machinery_runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 
@@ -222,17 +221,16 @@ func (plc *PodLabelController) handlePod(pod *corev1.Pod) error {
 	}
 	newPod := o.(*corev1.Pod)
 
-	// Get latest pod from api
-	// newPod, err := plc.client.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), metav1.GetOptions{})
-	// if err != nil {
-	// 	return err
-	// }
-
 	// apply labels if needed
 	// if no changes then return
 	if !plc.labelPod(newPod) {
 		return nil
 	}
+
+	// Uncomment to test threaded queue
+	// log.Printf("Long operation on %s starting\n", pod.GetName())
+	// time.Sleep(time.Second * 3)
+	// log.Printf("Long operation on %s done\n", pod.GetName())
 
 	oldData, err := json.Marshal(pod)
 	if err != nil {
@@ -272,7 +270,7 @@ func (plc *PodLabelController) labelPod(pod *corev1.Pod) bool {
 			// check keys
 			for k, newVal := range c.Spec.Labels {
 				if curVal, ok := pod.GetLabels()[k]; ok && curVal == newVal {
-					log.Printf("Pod %s already has label: %s=%s", pod.GetName(), k, newVal)
+					// log.Printf("Pod %s already has label: %s=%s", pod.GetName(), k, newVal)
 				} else {
 					log.Printf("Pod %s needs label: %s=%s", pod.GetName(), k, newVal)
 					pod.Labels[k] = newVal
@@ -284,14 +282,14 @@ func (plc *PodLabelController) labelPod(pod *corev1.Pod) bool {
 	return changed
 }
 
-func (plc *PodLabelController) ReconcileAllPods() {
+func (plc *PodLabelController) ReconcileAllPods(c *plv1alpha1.PodLabelConfig) {
 	// Only reconcile after initial sync
 	if !plc.HasSynced {
 		return
 	}
 
-	log.Println("Reconciling of all pods")
-	pods, err := plc.client.CoreV1().Pods(corev1.NamespaceAll).List(metav1.ListOptions{})
+	log.Printf("Reconciling of all pods for plc: %s\n", c.GetNamespace())
+	pods, err := plc.client.CoreV1().Pods(c.GetNamespace()).List(metav1.ListOptions{})
 	if err != nil {
 		log.Println(err)
 	}
@@ -312,14 +310,14 @@ func (plc *PodLabelController) StartPodLabelConfigController(killChan chan struc
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				log.Print("PodLabelConfig Add Event")
-				plc.ReconcileAllPods()
+				plc.ReconcileAllPods(obj.(*plv1alpha1.PodLabelConfig))
 			},
 			UpdateFunc: func(oldobj interface{}, newobj interface{}) {
 				log.Print("PodLabelConfig Update Event")
 				// Make sure object is not set for deltion and was actually changed
 				if newobj.(*plv1alpha1.PodLabelConfig).GetDeletionTimestamp() == nil &&
 					oldobj.(*plv1alpha1.PodLabelConfig).GetResourceVersion() != newobj.(*plv1alpha1.PodLabelConfig).GetResourceVersion() {
-					plc.ReconcileAllPods()
+					plc.ReconcileAllPods(newobj.(*plv1alpha1.PodLabelConfig))
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
