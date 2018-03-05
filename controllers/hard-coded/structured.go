@@ -79,7 +79,7 @@ func (plc *PodLabelController) Run() {
 	)
 
 	stopChan := make(chan struct{})
-	controller.Run(stopChan)
+	go controller.Run(stopChan)
 	<-stopChan
 }
 

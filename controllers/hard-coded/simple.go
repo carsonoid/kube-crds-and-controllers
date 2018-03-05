@@ -89,7 +89,7 @@ func runController(client *kubernetes.Clientset) {
 	)
 
 	stopChan := make(chan struct{})
-	controller.Run(stopChan)
+	go controller.Run(stopChan)
 	<-stopChan
 }
 
