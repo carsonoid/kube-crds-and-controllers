@@ -1,6 +1,6 @@
 DIFF_REPO      ?= kube-crds-and-controllers-diffs
 DIFF_REPO_PATH  = ../$(DIFF_REPO)
-DIFF_REPO_URL   = git@gitlab.com:carsonoid/$(DIFF_REPO).git
+DIFF_REPO_URL   = git@github.com:carsonoid/kube-crds-and-controllers-diffs.git
 DIFF_REPO_GIT   = git -C $(DIFF_REPO_PATH)
 
 PHONY: deps clean gen-go-crds diffs-repo push-diffs-repo 
@@ -43,7 +43,11 @@ diffs-repo:
 	$(DIFF_REPO_GIT) init
 	$(DIFF_REPO_GIT) remote add origin $(DIFF_REPO_URL)
 	echo "# Kube Controller Evolution" > $(DIFF_REPO_PATH)/README.md
+	echo >> $(DIFF_REPO_PATH)/README.md
+	echo "Diff view of controllers from original repo: https://github.com/carsonoid/kube-crds-and-controllers" >> $(DIFF_REPO_PATH)/README.md
 	$(DIFF_REPO_GIT) add README.md
+	cp LICENSE $(DIFF_REPO_PATH)/
+	$(DIFF_REPO_GIT) add LICENSE
 	$(DIFF_REPO_GIT) commit -m "Initial commit"
 	for c in \
 	controllers/hard-coded/simple.go \
