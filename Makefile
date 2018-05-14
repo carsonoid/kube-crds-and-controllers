@@ -14,6 +14,8 @@ clean-build:
 	# Clean up build dir
 	rm -rf build/*
 
+# Example Controllers
+
 clean-go-crds:
 	# Delete all generated code.
 	rm -rf controllers/crd-configured/pkg/client
@@ -66,3 +68,25 @@ diffs-repo:
 
 push-diffs-repo: diffs-repo
 	$(DIFF_REPO_GIT) push -f -u origin dev
+
+# Workshop Provisioner
+
+wp-clean-go-crds:
+	# Delete all generated code.
+	rm -rf controllers/workshop-provisioner/pkg/client
+	rm -f  controllers/workshop-provisioner/pkg/apis/*/*/zz_generated.deepcopy.go
+
+wp-gen-go-crds: wp-clean-go-crds # Must be cleaned so that removals happen properly
+	./vendor/k8s.io/code-generator/generate-groups.sh \
+	all \
+	github.com/carsonoid/kube-crds-and-controllers/controllers/workshop-provisioner/pkg/client \
+	github.com/carsonoid/kube-crds-and-controllers/controllers/workshop-provisioner/pkg/apis \
+	"provisioner:v1alpha1"
+
+workshop-provisioner-all: workshop-provisioner-crds workshop-provisioner
+
+workshop-provisioner-crds: wp-clean-go-crds wp-gen-go-crds
+
+workshop-provisioner: controllers/workshop-provisioner/workshop-provisioner
+
+run-provisioner: run-controllers/workshop-provisioner/workshop-provisioner
