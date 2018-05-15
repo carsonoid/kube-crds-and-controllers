@@ -110,3 +110,16 @@ This can be simply captured via `kubectl` to a file
 ```bash
 kubectl get wa user1 -o jsonpath="{.status.kubeconfig}" > ./podlabeler.kubeconfig
 ```
+
+### Running the controllers
+
+```bash
+export OPTS="-kubeconfig ./podlabeler.kubeconfig"
+make run-controllers/hard-coded/simple
+make run-controllers/hard-coded/structured
+make run-controllers/hard-coded/structured OPTS="$OPTS -config controllers/hard-coded/config.yaml"
+make run-controllers/configmap-configured/single-config
+make run-controllers/configmap-configured/multi-config
+make run-controllers/crd-configured/simple
+make run-controllers/crd-configured/workqueue
+```
