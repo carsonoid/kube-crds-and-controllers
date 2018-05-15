@@ -34,7 +34,7 @@ controllers/%:
 	go build -i -o build/$@ $@.go
 
 run-controllers/%: controllers/%
-	./build/controllers/$* $OPTS
+	./build/controllers/$* $(OPTS)
 
 # Represent controller revisions in a single git repo commit set.
 diffs-repo:
