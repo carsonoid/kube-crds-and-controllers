@@ -26,7 +26,7 @@ type WorkshopAttendee struct {
 // WorkshopAttendeeSpec describes extra attributes of the attendee
 type WorkshopAttendeeSpec struct {
 	// Email is the address that the credentials should be sent to
-	Email string `json:"labels,omitempty"`
+	Email string `json:"email,omitempty"`
 }
 
 type WorkshopAttendeeState string
