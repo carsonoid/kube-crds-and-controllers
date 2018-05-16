@@ -108,7 +108,7 @@ kubectl get wa $WAUSER -o jsonpath="{.status.state}"
 This can be simply captured via `kubectl` to a file
 
 ```bash
-kubectl get wa user1 -o jsonpath="{.status.kubeconfig}" > ./podlabeler.kubeconfig
+kubectl get wa $WAUSER -o jsonpath="{.status.kubeconfig}" > ./podlabeler.kubeconfig
 ```
 
 ### Running the controllers
