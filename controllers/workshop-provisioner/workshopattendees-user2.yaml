@@ -1,0 +1,6 @@
+apiVersion: provisioner.k8s.carsonoid.net/v1alpha1
+kind: WorkshopAttendee
+metadata:
+  name: user2
+spec:
+  email: ca@carson-anderson.com
